@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "https://github.com/broadinstitute/bedspread/releases/download/v0.1.1/bedspread-0.1.1-py3-none-any.whl",
+#   "https://broadinstitute.github.io/bedspread/bedspread-0.1.1-py3-none-any.whl",
 #   "pandas",
 #   "plotly",
 #   "scipy",

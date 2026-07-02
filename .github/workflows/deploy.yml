@@ -24,8 +24,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install marimo + bedspread
-        run: pip install marimo bedspread
+      - name: Install marimo + build tools
+        run: pip install marimo build
+
+      - name: Install bedspread (for notebook export)
+        run: pip install .
+
+      - name: Build bedspread wheel (served alongside notebooks for micropip)
+        run: |
+          python -m build --wheel
+          mkdir -p _site
+          cp dist/*.whl _site/
 
       - name: Export notebooks to WASM HTML
         run: |
