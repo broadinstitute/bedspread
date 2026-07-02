@@ -97,6 +97,10 @@ def build_peak_nodeset_df(
       - local_start
       - local_end
     """
+    _SCHEMA = ["peak_id", "origin_path", "local_start", "local_end",
+               "peak_nodeset", "node_count", "node_total_len_bp"]
+    if peaks_df.empty:
+        return pd.DataFrame(columns=_SCHEMA)
     required = ["path", "local_start", "local_end"]
     missing = [c for c in required if c not in peaks_df.columns]
     if missing:
@@ -140,7 +144,7 @@ def build_peak_nodeset_df(
 
         rows.append(out)
 
-    peak_nodeset_df = pd.DataFrame(rows)
+    peak_nodeset_df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=_SCHEMA)
 
     if verbose:
         print("[simple] build_peak_nodeset_df complete:")
