@@ -84,27 +84,31 @@ def bs_upload_beds(mo):
 @app.cell
 def bs_ingest(bs_bed_files, bs_has_header, bs_path_names, ingest_peak_bed_list, mo, pd):
     import tempfile, pathlib
-    mo.stop(not bs_bed_files.value, mo.md("Upload one or more `.bed` peak files above."))
-    _dfs = []
-    _report = {"total_peaks": 0, "total_valid": 0}
-    for _f in bs_bed_files.value:
-        _p_bed = pathlib.Path(tempfile.mkdtemp()) / _f.name
-        _p_bed.write_bytes(_f.contents)
-        _df, _rep = ingest_peak_bed_list(
-            [str(_p_bed)], bs_path_names,
-            col_names=["chrom", "start", "end", "score"],
-            has_header=bs_has_header.value, verbose=False,
+    if not bs_bed_files.value:
+        bs_peaks_df = pd.DataFrame()
+        _msg = mo.callout(mo.md("Upload `.bed` peak files above to overlay peaks on the graph."), kind="info")
+    else:
+        _dfs = []
+        _report = {"total_peaks": 0, "total_valid": 0}
+        for _f in bs_bed_files.value:
+            _p_bed = pathlib.Path(tempfile.mkdtemp()) / _f.name
+            _p_bed.write_bytes(_f.contents)
+            _df, _rep = ingest_peak_bed_list(
+                [str(_p_bed)], bs_path_names,
+                col_names=["chrom", "start", "end", "score"],
+                has_header=bs_has_header.value, verbose=False,
+            )
+            if len(_df):
+                _df["source_bed"] = _f.name
+                _dfs.append(_df)
+            _report["total_peaks"] += _rep["total_peaks"]
+            _report["total_valid"] += _rep["total_valid"]
+        bs_peaks_df = pd.concat(_dfs, ignore_index=True) if _dfs else pd.DataFrame()
+        _msg = mo.md(
+            f"Ingested **{len(bs_peaks_df)}** valid peaks from **{len(bs_bed_files.value)}** BED files "
+            f"({_report['total_valid']}/{_report['total_peaks']} rows)."
         )
-        if len(_df):
-            _df["source_bed"] = _f.name
-            _dfs.append(_df)
-        _report["total_peaks"] += _rep["total_peaks"]
-        _report["total_valid"] += _rep["total_valid"]
-    bs_peaks_df = pd.concat(_dfs, ignore_index=True) if _dfs else pd.DataFrame()
-    mo.md(
-        f"Ingested **{len(bs_peaks_df)}** valid peaks from **{len(bs_bed_files.value)}** BED files "
-        f"({_report['total_valid']}/{_report['total_peaks']} rows)."
-    )
+    _msg
     return (bs_peaks_df,)
 
 
