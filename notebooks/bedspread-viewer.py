@@ -23,13 +23,19 @@ def _():
 
 
 @app.cell(hide_code=True)
-def bs_setup():
-    import pandas as pd
-    import plotly.graph_objects as go
-    from bedspread import load_sgm_viewer, ingest_peak_bed_list, overlay_peaks
-    import bedspread.interactive as bi
-    import bedspread.screening as bss
-
+def bs_setup(mo):
+    import traceback as _tb
+    try:
+        import pandas as pd
+        import plotly.graph_objects as go
+        from bedspread import load_sgm_viewer, ingest_peak_bed_list, overlay_peaks
+        import bedspread.interactive as bi
+        import bedspread.screening as bss
+        _status = mo.callout(mo.md("bedspread loaded."), kind="success")
+    except Exception as _e:
+        _status = mo.callout(mo.md(f"**bedspread import failed:**\n```\n{_tb.format_exc()}\n```"), kind="danger")
+        raise
+    _status
     return bi, bss, go, ingest_peak_bed_list, load_sgm_viewer, overlay_peaks, pd
 
 
