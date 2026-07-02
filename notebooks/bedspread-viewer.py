@@ -53,13 +53,18 @@ def bs_upload_npz(mo):
 @app.cell
 def bs_load_npz(bs_npz_file, load_sgm_viewer, mo):
     import tempfile, pathlib
-    mo.stop(not bs_npz_file.value, mo.md("Upload a `.npz` graph file above."))
-    _f = bs_npz_file.value[0]
-    _tmp = pathlib.Path(tempfile.mkdtemp()) / _f.name
-    _tmp.write_bytes(_f.contents)
-    bs_sgm_base = load_sgm_viewer(str(_tmp))
-    bs_path_names = bs_sgm_base.path_names
-    mo.md(f"Loaded **{_f.name}** — **{len(bs_path_names)} paths**, {bs_sgm_base.shape[0]:,} nodes.")
+    if not bs_npz_file.value:
+        bs_sgm_base = None
+        bs_path_names = []
+        _msg = mo.callout(mo.md("Upload a `.npz` graph file above to get started."), kind="info")
+    else:
+        _f = bs_npz_file.value[0]
+        _tmp = pathlib.Path(tempfile.mkdtemp()) / _f.name
+        _tmp.write_bytes(_f.contents)
+        bs_sgm_base = load_sgm_viewer(str(_tmp))
+        bs_path_names = bs_sgm_base.path_names
+        _msg = mo.md(f"Loaded **{_f.name}** — **{len(bs_path_names)} paths**, {bs_sgm_base.shape[0]:,} nodes.")
+    _msg
     return bs_sgm_base, bs_path_names
 
 
@@ -132,7 +137,8 @@ def bs_peak_sets(bs_bed_files, mo):
 
 
 @app.cell(hide_code=True)
-def bs_build(bs_peak_sets, bs_peaks_df, bs_sgm_base, bs_signal_col, overlay_peaks):
+def bs_build(bs_peak_sets, bs_peaks_df, bs_sgm_base, bs_signal_col, mo, overlay_peaks):
+    mo.stop(bs_sgm_base is None)
     bs_peaks_used = bs_peaks_df
     if "source_bed" in bs_peaks_df.columns:
         bs_peaks_used = bs_peaks_df[bs_peaks_df["source_bed"].isin(bs_peak_sets.value)]
