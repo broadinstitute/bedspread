@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bedspread"
+version = "0.1.0"
+description = "Pangenome BED peak visualization for pangenome graphs"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "plotly>=5.0",
+    "intervaltree>=3.0",
+    "tqdm",
+    "psutil",
+]
+
+[project.urls]
+Repository = "https://github.com/griffinlab/bedspread"
