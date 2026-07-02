@@ -1,12 +1,13 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "https://broadinstitute.github.io/bedspread/bedspread-0.1.1-py3-none-any.whl",
 #   "pandas",
 #   "plotly",
 #   "scipy",
 #   "numpy",
 #   "intervaltree",
+#   "tqdm",
+#   "matplotlib",
 # ]
 # ///
 
@@ -23,19 +24,30 @@ def _():
 
 
 @app.cell(hide_code=True)
-def bs_setup(mo):
-    import traceback as _tb
+async def bs_setup(mo):
+    import sys, traceback as _tb
+    _WHEEL = "https://broadinstitute.github.io/bedspread/bedspread-0.1.1-py3-none-any.whl"
+    if "pyodide" in sys.modules:
+        import micropip as _micropip
+        try:
+            await _micropip.install(_WHEEL)
+        except Exception as _e:
+            mo.stop(True, mo.callout(mo.md(
+                f"**micropip install failed:**\n```\n{_tb.format_exc()}\n```"
+            ), kind="danger"))
+    else:
+        import subprocess as _sp
+        _sp.run(["pip", "install", "-q", _WHEEL], check=False)
     try:
         import pandas as pd
         import plotly.graph_objects as go
         from bedspread import load_sgm_viewer, ingest_peak_bed_list, overlay_peaks
         import bedspread.interactive as bi
         import bedspread.screening as bss
-        _status = mo.callout(mo.md("bedspread loaded."), kind="success")
-    except Exception as _e:
-        _status = mo.callout(mo.md(f"**bedspread import failed:**\n```\n{_tb.format_exc()}\n```"), kind="danger")
-        raise
-    _status
+    except Exception:
+        mo.stop(True, mo.callout(mo.md(
+            f"**bedspread import failed:**\n```\n{_tb.format_exc()}\n```"
+        ), kind="danger"))
     return bi, bss, go, ingest_peak_bed_list, load_sgm_viewer, overlay_peaks, pd
 
 
