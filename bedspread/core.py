@@ -15,6 +15,7 @@ Requires odgi to be loaded before importing this module. In your notebook:
 
 import os
 import pickle
+import dataclasses
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass, field
@@ -1174,3 +1175,203 @@ def load_sparse_matrix(prefix: str) -> SparseGraphMatrix:
     print(f"Loaded SparseGraphMatrix from {prefix}_*")
     sgm.summary()
     return sgm
+
+
+# ============================================================================
+# VIEWER SERIALIZATION
+# ============================================================================
+
+def save_sgm_viewer(sgm: SparseGraphMatrix, path: str) -> None:
+    """Save a portable single-file .npz for the viewer.
+
+    Stores only the data needed for the interactive viewer — no odgi objects,
+    no interval_trees, no node_to_genomic.  The matrix is clamped to
+    presence-only (0/1 float32) so the viewer can re-overlay signals via
+    ``overlay_peaks``.
+
+    Parameters
+    ----------
+    sgm:
+        SparseGraphMatrix to serialize.
+    path:
+        Output file path.  ``.npz`` will be appended by numpy if absent.
+    """
+    # Clamp to presence-only
+    mat = (sgm.matrix > 0).astype(np.float32).tocsr()
+
+    node_ids = np.array(sgm.node_ids, dtype=np.int64)
+    path_names = np.array(sgm.path_names, dtype=object)
+
+    n_nodes = len(sgm.node_ids)
+    layout_x_start = np.zeros(n_nodes, dtype=np.float64)
+    layout_x_end = np.zeros(n_nodes, dtype=np.float64)
+    layout_length = np.zeros(n_nodes, dtype=np.float64)
+
+    for i, nid in enumerate(sgm.node_ids):
+        layout = sgm.node_to_layout[nid]
+        layout_x_start[i] = layout['x_start']
+        layout_x_end[i] = layout['x_end']
+        layout_length[i] = layout['length']
+
+    # Build CSR-style ragged arrays for path→nodes and path→orientations
+    n_paths = len(sgm.path_names)
+    offsets = np.zeros(n_paths + 1, dtype=np.int64)
+    for i, pname in enumerate(sgm.path_names):
+        nodes = sgm.path_to_nodes.get(pname, [])
+        offsets[i + 1] = offsets[i] + len(nodes)
+
+    total = int(offsets[-1])
+    path_nodes_flat = np.zeros(total, dtype=np.int64)
+    path_orients_flat = np.zeros(total, dtype=bool)
+
+    for i, pname in enumerate(sgm.path_names):
+        start = int(offsets[i])
+        end = int(offsets[i + 1])
+        nodes = sgm.path_to_nodes.get(pname, [])
+        orients = sgm.path_to_node_orientations.get(pname, [False] * len(nodes))
+        path_nodes_flat[start:end] = nodes
+        path_orients_flat[start:end] = orients
+
+    np.savez_compressed(
+        path,
+        matrix_data=mat.data,
+        matrix_indices=mat.indices,
+        matrix_indptr=mat.indptr,
+        matrix_shape=np.array(mat.shape, dtype=np.int64),
+        node_ids=node_ids,
+        path_names=path_names,
+        layout_x_start=layout_x_start,
+        layout_x_end=layout_x_end,
+        layout_length=layout_length,
+        path_nodes_flat=path_nodes_flat,
+        path_nodes_offsets=offsets,
+        path_orients_flat=path_orients_flat,
+    )
+
+    # Resolve actual filename (numpy appends .npz if missing)
+    actual_path = path if path.endswith('.npz') else path + '.npz'
+    file_size = os.path.getsize(actual_path)
+    print(f"Saved viewer SGM to {actual_path} ({file_size / 1024**2:.2f} MB)")
+
+
+def load_sgm_viewer(path: str) -> SparseGraphMatrix:
+    """Load a .npz saved by :func:`save_sgm_viewer`.
+
+    Reconstructs a ``SparseGraphMatrix`` from the compact viewer file.
+    ``node_to_genomic`` and ``interval_trees`` are set to empty dicts;
+    ``graph_node_order`` is set equal to ``node_ids``.
+
+    Parameters
+    ----------
+    path:
+        Path to the ``.npz`` file.
+
+    Returns
+    -------
+    SparseGraphMatrix
+    """
+    data = np.load(path, allow_pickle=True)
+
+    mat = csr_matrix(
+        (data['matrix_data'], data['matrix_indices'], data['matrix_indptr']),
+        shape=tuple(data['matrix_shape']),
+    )
+
+    node_ids = [int(x) for x in data['node_ids']]
+    path_names = [str(x) for x in data['path_names']]
+
+    node_to_layout: Dict[int, Dict[str, float]] = {}
+    for i, nid in enumerate(node_ids):
+        node_to_layout[nid] = {
+            'x_start': float(data['layout_x_start'][i]),
+            'x_end': float(data['layout_x_end'][i]),
+            'length': float(data['layout_length'][i]),
+        }
+
+    offsets = data['path_nodes_offsets']
+    path_nodes_flat = data['path_nodes_flat']
+    path_orients_flat = data['path_orients_flat']
+
+    path_to_nodes: Dict[str, List[int]] = {}
+    path_to_node_orientations: Dict[str, List[bool]] = {}
+    for i, pname in enumerate(path_names):
+        start = int(offsets[i])
+        end = int(offsets[i + 1])
+        path_to_nodes[pname] = path_nodes_flat[start:end].tolist()
+        path_to_node_orientations[pname] = path_orients_flat[start:end].tolist()
+
+    return SparseGraphMatrix(
+        matrix=mat,
+        node_ids=node_ids,
+        path_names=path_names,
+        node_to_layout=node_to_layout,
+        node_to_genomic={},
+        path_to_nodes=path_to_nodes,
+        path_to_node_orientations=path_to_node_orientations,
+        interval_trees={},
+        graph_node_order=node_ids,
+        metadata={},
+    )
+
+
+def overlay_peaks(
+    base_sgm: SparseGraphMatrix,
+    peaks_df,
+    signal_column: str = 'score',
+    verbose: bool = False,
+) -> SparseGraphMatrix:
+    """Re-overlay peak signals onto a presence-only SparseGraphMatrix.
+
+    This is the signal-overlay step from :func:`build_sparse_matrix` (step 5)
+    but takes a pre-computed ``base_sgm`` instead of building from an odgi
+    graph.  The input matrix should contain 0/1 presence values; nodes that
+    overlap a peak will be set to ``1.0 + peak_signal``.
+
+    Parameters
+    ----------
+    base_sgm:
+        Presence-only SparseGraphMatrix (e.g. loaded via :func:`load_sgm_viewer`).
+    peaks_df:
+        DataFrame of peaks as produced by :func:`ingest_peak_bed_list`.
+    signal_column:
+        Column in ``peaks_df`` to use as the signal value (default ``'score'``).
+    verbose:
+        Print progress information.
+
+    Returns
+    -------
+    SparseGraphMatrix
+        New SparseGraphMatrix identical to ``base_sgm`` except with the
+        signal-overlaid CSR matrix.
+    """
+    mat = base_sgm.matrix.tolil()
+
+    if peaks_df is None or peaks_df.empty:
+        return dataclasses.replace(base_sgm, matrix=mat.tocsr())
+
+    interval_trees = build_interval_trees(peaks_df, base_sgm.path_names, verbose=verbose)
+
+    pbar = tqdm(base_sgm.path_names, desc="Signal overlay", disable=not verbose)
+    for path_name in pbar:
+        if path_name not in base_sgm.path_to_nodes or path_name not in interval_trees:
+            continue
+
+        tree = interval_trees[path_name]
+        if len(tree) == 0:
+            continue
+
+        path_idx = base_sgm.path_to_idx[path_name]
+        path_offset = 0
+
+        for node_id in base_sgm.path_to_nodes[path_name]:
+            node_idx = base_sgm.node_to_idx[node_id]
+            node_len = base_sgm.node_to_layout[node_id]['length']
+
+            overlaps = tree.overlap(path_offset, path_offset + node_len)
+            if overlaps:
+                peak_signal = max(iv.data[signal_column] for iv in overlaps)
+                mat[node_idx, path_idx] = max(mat[node_idx, path_idx], 1.0 + peak_signal)
+
+            path_offset += node_len
+
+    return dataclasses.replace(base_sgm, matrix=mat.tocsr())

@@ -19,6 +19,9 @@ from bedspread.core import (
     export_static_plot,
     save_sparse_matrix,
     load_sparse_matrix,
+    save_sgm_viewer,
+    load_sgm_viewer,
+    overlay_peaks,
 )
 from bedspread import interactive, screening
 
@@ -41,6 +44,9 @@ __all__ = [
     "export_static_plot",
     "save_sparse_matrix",
     "load_sparse_matrix",
+    "save_sgm_viewer",
+    "load_sgm_viewer",
+    "overlay_peaks",
     "interactive",
     "screening",
 ]
