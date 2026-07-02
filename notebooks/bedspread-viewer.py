@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "bedspread",
+#   "https://github.com/broadinstitute/bedspread/releases/download/v0.1.0/bedspread-0.1.0-py3-none-any.whl",
 #   "pandas",
 #   "plotly",
 #   "scipy",
@@ -23,26 +23,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
-    import sys, subprocess, importlib
-    return importlib, subprocess, sys
-
-
-@app.cell(hide_code=True)
-def bs_setup(importlib, subprocess):
-    BEDSPREAD_REPO = "https://github.com/broadinstitute/bedspread"
-
-    def ensure_bedspread():
-        try:
-            import bedspread  # noqa: F401
-            return
-        except ImportError:
-            pass
-        subprocess.run(["pip", "install", "-q", f"git+{BEDSPREAD_REPO}"], check=False)
-        importlib.invalidate_caches()
-
-    ensure_bedspread()
-
+def bs_setup():
     import pandas as pd
     import plotly.graph_objects as go
     from bedspread import load_sgm_viewer, ingest_peak_bed_list, overlay_peaks
