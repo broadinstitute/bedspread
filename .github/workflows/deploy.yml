@@ -44,6 +44,9 @@ jobs:
               --mode run
           done
 
+      - name: Disable Jekyll (prevent _ files from being stripped)
+        run: touch _site/.nojekyll
+
       - name: Generate index page
         run: |
           cat > _site/index.html <<'EOF'
