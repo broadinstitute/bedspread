@@ -70,14 +70,14 @@ def bs_upload_npz(mo):
 
 @app.cell
 def bs_load_npz(bs_npz_file, load_sgm_viewer, mo):
-    import tempfile, pathlib
+    import tempfile as _tempfile, pathlib as _pathlib
     if not bs_npz_file.value:
         bs_sgm_base = None
         bs_path_names = []
         _msg = mo.callout(mo.md("Upload a `.npz` graph file above to get started."), kind="info")
     else:
         _f = bs_npz_file.value[0]
-        _tmp = pathlib.Path(tempfile.mkdtemp()) / _f.name
+        _tmp = _pathlib.Path(_tempfile.mkdtemp()) / _f.name
         _tmp.write_bytes(_f.contents)
         bs_sgm_base = load_sgm_viewer(str(_tmp))
         bs_path_names = bs_sgm_base.path_names
@@ -106,7 +106,7 @@ def bs_upload_beds(mo):
 
 @app.cell
 def bs_ingest(bs_bed_files, bs_has_header, bs_path_names, ingest_peak_bed_list, mo, pd):
-    import tempfile, pathlib
+    import tempfile as _tempfile, pathlib as _pathlib
     if not bs_bed_files.value:
         bs_peaks_df = pd.DataFrame()
         _msg = mo.callout(mo.md("Upload `.bed` peak files above to overlay peaks on the graph."), kind="info")
@@ -114,7 +114,7 @@ def bs_ingest(bs_bed_files, bs_has_header, bs_path_names, ingest_peak_bed_list, 
         _dfs = []
         _report = {"total_peaks": 0, "total_valid": 0}
         for _f in bs_bed_files.value:
-            _p_bed = pathlib.Path(tempfile.mkdtemp()) / _f.name
+            _p_bed = _pathlib.Path(_tempfile.mkdtemp()) / _f.name
             _p_bed.write_bytes(_f.contents)
             _df, _rep = ingest_peak_bed_list(
                 [str(_p_bed)], bs_path_names,
