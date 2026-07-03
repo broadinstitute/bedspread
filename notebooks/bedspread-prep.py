@@ -14,6 +14,9 @@ import argparse
 import sys
 from pathlib import Path
 
+# Allow running directly from a cloned repo without installing the package
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -46,8 +49,9 @@ def main():
         from bedspread import list_paths, build_sparse_matrix, save_sgm_viewer
     except ImportError:
         sys.exit(
-            "Error: bedspread is not installed.\n"
-            "Install via:  pip install bedspread"
+            "Error: could not import bedspread.\n"
+            "Run this script from the cloned repo root, or:\n"
+            "  pip install -e /path/to/bedspread_pkg"
         )
 
     print(f"Loading {og_path.name} ...", flush=True)
