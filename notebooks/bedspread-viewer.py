@@ -26,6 +26,12 @@ def _():
 @app.cell(hide_code=True)
 async def bs_setup(mo):
     import sys, traceback as _tb
+    # tqdm uses multiprocessing.RLock which is unsupported in Pyodide;
+    # thread locks are fine and tqdm accepts them as a drop-in.
+    if "pyodide" in sys.modules:
+        import threading as _threading, multiprocessing as _mp
+        _mp.RLock = _threading.RLock
+
     _WHEEL = "https://broadinstitute.github.io/bedspread/bedspread-0.1.1-py3-none-any.whl"
     if "pyodide" in sys.modules:
         import micropip as _micropip
