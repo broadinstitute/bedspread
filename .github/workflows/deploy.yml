@@ -37,12 +37,9 @@ jobs:
       - name: Export notebooks to WASM HTML
         run: |
           mkdir -p _site/notebooks
-          for nb in notebooks/*.py; do
-            name=$(basename "$nb" .py)
-            marimo export html-wasm "$nb" \
-              --output "_site/notebooks/${name}.html" \
-              --mode run
-          done
+          marimo export html-wasm notebooks/bedspread-viewer.py \
+            --output _site/notebooks/bedspread-viewer.html \
+            --mode run
 
       - name: Disable Jekyll (prevent _ files from being stripped)
         run: touch _site/.nojekyll
@@ -74,8 +71,9 @@ jobs:
                 Upload a pre-computed <code>.npz</code> graph + BED peak files to explore interactively.
               </li>
               <li>
-                <a href="notebooks/bedspread-prep.html"><strong>BedSpread Prep</strong></a><br>
-                (Requires local marimo + odgi) Convert an <code>.og</code> pangenome graph to a viewer-compatible <code>.npz</code>.
+                <strong>BedSpread Prep</strong> — local CLI script (<code>notebooks/bedspread-prep.py</code>)<br>
+                Requires odgi. Converts an <code>.og</code> pangenome graph → viewer-compatible <code>.npz</code>.
+                See the <a href="https://github.com/broadinstitute/bedspread">repo README</a> for usage.
               </li>
             </ul>
             <hr>
