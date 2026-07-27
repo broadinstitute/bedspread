@@ -66,23 +66,37 @@ def list_paths(g, max_show=50, verbose=True):
 
 
 def clean_path_name(path_name: str) -> str:
-    """Remove coordinate suffix from path name (e.g., 'MOU#1#OK649234.1:123-456' -> 'MOU#1#OK649234.1')."""
-    return path_name.split(':')[0]
+    """Remove coordinate suffix from path name.
+
+    Handles both PGGB-style colon suffixes ('MOU#1#OK649234.1:123-456' ->
+    'MOU#1#OK649234.1') and PanSN/Cactus-style bracket subrange suffixes
+    ('APD#0#OK649231.1#0[4025966-4097960]' -> 'APD#0#OK649231.1#0').
+    """
+    for sep in (':', '['):
+        if sep in path_name:
+            return path_name.split(sep)[0]
+    return path_name
 
 
 def extract_path_offset(path_name: str) -> Optional[Tuple[int, int]]:
     """Extract offset coordinates from path name.
 
     Args:
-        path_name: Path name like 'MOU#1#OK649234.1:4109765-4191507'
+        path_name: Path name with either a colon suffix, e.g.
+            'MOU#1#OK649234.1:4109765-4191507', or a PanSN/Cactus-style
+            bracket subrange suffix, e.g.
+            'APD#0#OK649231.1#0[4025966-4097960]'.
 
     Returns:
         Tuple of (start_offset, end_offset) or None if no offset found
     """
-    if ':' not in path_name:
+    if ':' in path_name:
+        suffix = path_name.split(':')[1]
+    elif '[' in path_name and path_name.endswith(']'):
+        suffix = path_name[path_name.index('[') + 1:-1]
+    else:
         return None
 
-    suffix = path_name.split(':')[1]
     if '-' not in suffix:
         return None
 
@@ -166,8 +180,8 @@ def parse_regionpeak(regionpeak_file: str,
         print(f"Loaded {len(df)} peaks from {regionpeak_file} (format: {format_info['format']})")
 
     # Create path mapping (cleaned name -> full name with coords)
-    # Only use paths that have coordinate suffix (contain ':')
-    path_map = {clean_path_name(p): p for p in graph_paths if ':' in p}
+    # Only use paths with an extractable coordinate suffix (colon or bracket).
+    path_map = {clean_path_name(p): p for p in graph_paths if extract_path_offset(p) is not None}
 
     n_total = len(df)
     n_skipped = 0
