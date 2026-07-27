@@ -60,6 +60,12 @@ def _two_stage_norm(values: np.ndarray, vmax: float) -> np.ndarray:
     return np.clip(out, 0, 1)
 
 
+def _binary_norm(values: np.ndarray) -> np.ndarray:
+    """Flatten signal into 3 levels: absent -> 0, present -> GREY_FRAC, peak -> 1."""
+    v = np.asarray(values, dtype=float)
+    return np.where(v > 1.0, 1.0, np.where(v >= 1.0, GREY_FRAC, 0.0))
+
+
 @dataclass
 class RasterResult:
     raster_raw: np.ndarray      # (n_paths, W) raw matrix values (0 / 1 / 1+signal)
@@ -85,6 +91,7 @@ def rasterize(
     x0_bp: Optional[float] = None,
     x1_bp: Optional[float] = None,
     min_signal: float = 0.0,
+    binarize: bool = False,
 ) -> RasterResult:
     """Rasterize the graph into an (n_paths x bp_resolution) image.
 
@@ -126,7 +133,7 @@ def rasterize(
         raster = np.where((raster > 1.0) & ((raster - 1.0) < min_signal), 1.0, raster)
 
     vmax = float(raster.max()) if raster.size else 1.0
-    z_display = _two_stage_norm(raster, vmax)
+    z_display = _binary_norm(raster) if binarize else _two_stage_norm(raster, vmax)
     x_centers = x0 + (np.arange(W) + 0.5) / W * span
 
     return RasterResult(
@@ -148,6 +155,7 @@ def bedspread_plotly(
     x0_bp: Optional[float] = None,
     x1_bp: Optional[float] = None,
     min_signal: float = 0.0,
+    binarize: bool = False,
     highlight_nodes: Optional[set] = None,
     title: str = "BedSpread",
     height: Optional[int] = None,
@@ -155,10 +163,12 @@ def bedspread_plotly(
     """Interactive BedSpread heatmap (rows = paths, x = graph bp, color = signal).
 
     Drag to box-zoom (genomic window), hover for node/signal, double-click to
-    reset. ``highlight_nodes`` outlines columns belonging to the given node IDs.
+    reset. ``binarize`` flattens the signal gradient to 3 flat colors (white /
+    grey / red) instead of shading red by signal strength. ``highlight_nodes``
+    outlines columns belonging to the given node IDs.
     """
     rr = rasterize(sgm, paths=paths, bp_resolution=bp_resolution,
-                   x0_bp=x0_bp, x1_bp=x1_bp, min_signal=min_signal)
+                   x0_bp=x0_bp, x1_bp=x1_bp, min_signal=min_signal, binarize=binarize)
     n_paths = len(rr.paths)
 
     # customdata: node id + raw signal per cell, for the hover tooltip
